@@ -186,6 +186,7 @@ public class PdfFieldUtils {
         // --- COLUNA DA ESQUERDA (Título + Legenda) ---
         PdfPTable leftContent = new PdfPTable(1);
         leftContent.setWidthPercentage(100);
+        leftContent.getDefaultCell().setBorder(Rectangle.NO_BORDER);
 
         // 1. Cabeçalho (Número [29] + Título "Zona")
         // Usamos a lógica de célula única para evitar desalinhamento
@@ -216,20 +217,16 @@ public class PdfFieldUtils {
         splitTable.addCell(leftCell);
 
         // --- COLUNA DA DIREITA (Resposta [1]) ---
-        // Agora alinhada ao TOPO para ficar na mesma linha do [29]
-        PdfPCell answerCell = new PdfPCell(new Phrase(answer != null ? answer : "", CONTENT_FONT));
+        // Usamos uma tabela aninhada para garantir o mesmo alinhamento vertical da esquerda
+        PdfPTable rightContent = new PdfPTable(1);
+        rightContent.setWidthPercentage(100);
+        rightContent.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+
+        // Célula vazia no corpo, a resposta é desenhada dentro do quadrado pelo evento
+        PdfPCell answerCell = new PdfPCell(new Phrase("", CONTENT_FONT));
         answerCell.setBorder(Rectangle.NO_BORDER);
 
-        // Usa evento para desenhar quadrado no Topo Direito (ou Esquerdo da célula se
-        // preferir,
-        // mas aqui vamos desenhar no topo da célula para alinhar com o 29)
-        // Vamos usar TopLeftSquareEvent mas aplicar na célula que está à direita.
-        answerCell.setCellEvent(new TopLeftSquareEvent(ANSWER_BOX_SIZE, ""));
-        // OBS: Passamos string vazia para o evento e deixamos o iText desenhar o texto
-        // ou usamos a lógica completa se quiser centralizar perfeitamente.
-        // Melhor: Usar a centralização manual para garantir.
-
-        // Vamos usar uma célula que desenha o quadrado no topo esquerdo DESSA coluna
+        // Desenha o quadrado com a resposta dentro
         answerCell.setCellEvent(new TopLeftSquareEvent(ANSWER_BOX_SIZE, answer != null ? answer : ""));
 
         // Remove padding para o quadrado ficar no topo absoluto da célula
@@ -239,10 +236,13 @@ public class PdfFieldUtils {
         // Altura mínima para não cortar
         answerCell.setMinimumHeight(ANSWER_BOX_SIZE + 2f);
 
-        // Alinhamento vertical Topo
-        answerCell.setVerticalAlignment(Element.ALIGN_TOP);
+        rightContent.addCell(answerCell);
 
-        splitTable.addCell(answerCell);
+        PdfPCell rightCell = new PdfPCell(rightContent);
+        rightCell.setBorder(Rectangle.NO_BORDER);
+        rightCell.setPadding(0);
+
+        splitTable.addCell(rightCell);
 
         // --- CÉLULA MESTRA (Wrapper com borda em U) ---
         PdfPCell mainCell = new PdfPCell(splitTable);
