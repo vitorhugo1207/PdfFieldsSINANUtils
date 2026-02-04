@@ -285,21 +285,18 @@ public class PdfFieldUtils {
         mainTable.setWidthPercentage(100);
 
         // Header Personalizado para incluir Legenda na mesma linha
-        PdfPTable titleTable = new PdfPTable(1);
-        titleTable.setWidthPercentage(100);
+        // Usamos Phrase para manter o modo texto e o alinhamento correto (igual ao createHeaderCell)
+        Phrase headerPhrase = new Phrase();
+        headerPhrase.add(new Chunk(title, TITLE_FONT));
+        headerPhrase.add(new Chunk("   " + legend, LEGEND_FONT));
 
-        PdfPCell headerCell = new PdfPCell();
+        PdfPCell headerCell = new PdfPCell(headerPhrase);
         headerCell.setBorder(Rectangle.NO_BORDER);
         headerCell.setCellEvent(new TopLeftSquareEvent(NUMBER_BOX_SIZE, fieldNumber));
         headerCell.setPaddingLeft(NUMBER_BOX_SIZE + 5f); // Padding para o quadrado
         headerCell.setPaddingTop(2f);
         headerCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-
-        // Usamos um Paragraph para misturar Bold (Título) e Normal (Legenda)
-        Paragraph p = new Paragraph();
-        p.add(new Chunk(title, TITLE_FONT));
-        p.add(new Chunk("   " + legend, LEGEND_FONT)); // Espaço e legenda
-        headerCell.addElement(p);
+        headerCell.setMinimumHeight(NUMBER_BOX_SIZE + 2f);
 
         mainTable.addCell(headerCell);
 
