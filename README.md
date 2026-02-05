@@ -1,4 +1,4 @@
-Aqui se encontra o itext 5
-Também há uma branch para o itext 9
+Aqui se encontra o iText 8+
+Também há uma branch para o iText 5
 
 Só copiar e colocar o PdfFieldUitls.java no seu projeto

@@ -1,30 +1,31 @@
 package com.vitorhugo1207.pdffieldssisanutils;
 
-import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.List;
 
-import com.itextpdf.text.Document;
-import com.itextpdf.text.PageSize;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
+import com.itextpdf.kernel.geom.PageSize;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
 
 public class Main {
     public static void main(String[] args) {
         try {
             // Criar documento
-            Document document = new Document(PageSize.A4, 20, 20, 20, 20);
-            PdfWriter.getInstance(document, new FileOutputStream("relatorio_exemplo.pdf"));
-            document.open();
+                        PdfWriter writer = new PdfWriter("relatorio_exemplo.pdf");
+                        PdfDocument pdfDoc = new PdfDocument(writer);
+                        Document document = new Document(pdfDoc, PageSize.A4);
+                        document.setMargins(20, 20, 20, 20);
 
             // =====================================================
             // EXEMPLO 1: Campos lado a lado (28, 29, 30)
             // =====================================================
 
             // Campo 28 - (DDD) Telefone (usando campo descritivo)
-            PdfPCell campo28 = PdfFieldUtils.createDescriptiveField(
+            Cell campo28 = PdfFieldUtils.createDescriptiveField(
                     "28",
                     "(DDD) Telefone",
                     "(11) 99999-9999",
@@ -35,7 +36,7 @@ public class Main {
             List<String> legendaZona = Arrays.asList(
                     "1 - Urbana    2 - Rural",
                     "3 - Periurbana  9 - Ignorado");
-            PdfPCell campo29 = PdfFieldUtils.createFieldWithLegendAndAnswerBox(
+            Cell campo29 = PdfFieldUtils.createFieldWithLegendAndAnswerBox(
                     "29",
                     "Zona",
                     legendaZona,
@@ -43,7 +44,7 @@ public class Main {
                     25f);
 
             // Campo 30 - País
-            PdfPCell campo30 = PdfFieldUtils.createDescriptiveField(
+            Cell campo30 = PdfFieldUtils.createDescriptiveField(
                     "30",
                     "País (se residente fora do Brasil)",
                     "",
@@ -51,8 +52,8 @@ public class Main {
                     0);
 
             // Criar linha responsiva com os 3 campos
-            PdfPTable linhaComTresCampos = PdfFieldUtils.createResponsiveRow(
-                    new PdfPCell[] { campo28, campo29, campo30 },
+            Table linhaComTresCampos = PdfFieldUtils.createResponsiveRow(
+                    new Cell[] { campo28, campo29, campo30 },
                     new float[] { 30f, 25f, 45f });
             document.add(linhaComTresCampos);
             document.add(new Paragraph(" ")); // Espaçamento
@@ -61,7 +62,7 @@ public class Main {
             // EXEMPLO 2: Campo 32 - Ocupação (descritivo expandível)
             // =====================================================
 
-            PdfPCell campo32 = PdfFieldUtils.createDescriptiveField(
+            Cell campo32 = PdfFieldUtils.createDescriptiveField(
                     "32",
                     "Ocupação",
                     "Engenheiro de Software - Desenvolvedor Full Stack com experiência em " +
@@ -72,8 +73,8 @@ public class Main {
             );
 
             // Adiciona como linha única (100% largura)
-            PdfPTable linhaCampo32 = PdfFieldUtils.createResponsiveRow(
-                    new PdfPCell[] { campo32 },
+            Table linhaCampo32 = PdfFieldUtils.createResponsiveRow(
+                    new Cell[] { campo32 },
                     new float[] { 100f });
             document.add(linhaCampo32);
             document.add(new Paragraph(" ")); // Espaçamento
@@ -130,7 +131,7 @@ public class Main {
                     "2" // Oligúria/Anúria
             );
 
-            PdfPCell campo33 = PdfFieldUtils.createMultipleOptionsField(
+            Cell campo33 = PdfFieldUtils.createMultipleOptionsField(
                     "33",
                     "Sinais e Sintomas",
                     "1 - Sim    2 - Não    9 - Ignorado",
@@ -142,8 +143,8 @@ public class Main {
                     "Tosse seca persistente" // Valor do campo outros
             );
 
-            PdfPTable linhaCampo33 = PdfFieldUtils.createResponsiveRow(
-                    new PdfPCell[] { campo33 },
+            Table linhaCampo33 = PdfFieldUtils.createResponsiveRow(
+                    new Cell[] { campo33 },
                     new float[] { 100f });
             document.add(linhaCampo33);
             document.add(new Paragraph(" ")); // Espaçamento
@@ -162,7 +163,7 @@ public class Main {
 
             List<String> respostasExame = Arrays.asList("1", "1", "2", "1", "9", "2");
 
-            PdfPCell campoExames = PdfFieldUtils.createMultipleOptionsField(
+            Cell campoExames = PdfFieldUtils.createMultipleOptionsField(
                     "34",
                     "Exames Solicitados",
                     "1 - Sim  2 - Não  9 - Ignorado",
@@ -181,7 +182,7 @@ public class Main {
 
             List<String> respostasResultado = Arrays.asList("", "1", "", "");
 
-            PdfPCell campoResultado = PdfFieldUtils.createMultipleOptionsField(
+            Cell campoResultado = PdfFieldUtils.createMultipleOptionsField(
                     "35",
                     "Resultado",
                     "1 - Marcar opção",
@@ -193,8 +194,8 @@ public class Main {
                     null);
 
             // Criar linha com dois campos lado a lado
-            PdfPTable linhaDoisCampos = PdfFieldUtils.createResponsiveRow(
-                    new PdfPCell[] { campoExames, campoResultado },
+            Table linhaDoisCampos = PdfFieldUtils.createResponsiveRow(
+                    new Cell[] { campoExames, campoResultado },
                     new float[] { 50f, 50f });
             document.add(linhaDoisCampos);
 

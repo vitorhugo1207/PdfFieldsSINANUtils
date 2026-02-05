@@ -1,13 +1,28 @@
 package com.vitorhugo1207.pdffieldssisanutils;
 
-import com.itextpdf.text.*;
-import com.itextpdf.text.pdf.*;
-
 import java.util.List;
+
+import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.geom.Rectangle;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.layout.borders.Border;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Text;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.layout.properties.VerticalAlignment;
+import com.itextpdf.layout.renderer.CellRenderer;
+import com.itextpdf.layout.renderer.DrawContext;
+import com.itextpdf.layout.renderer.IRenderer;
 
 /**
  * Classe utilitária para criar campos estilizados em relatórios PDF usando
- * iText 5
+ * iText 8+
  * Compatível com layout responsivo para campos lado a lado
  */
 public class PdfFieldUtils {
@@ -21,32 +36,44 @@ public class PdfFieldUtils {
     private static final float CHECKBOX_SIZE = 10f;
     private static final float ANSWER_BOX_SIZE = 16f;
 
-    // Fontes
-    private static Font TITLE_FONT;
-    private static Font LEGEND_FONT;
-    private static Font CONTENT_FONT;
-    private static Font NUMBER_FONT;
+    // Fontes (iText 8+)
+    private static final PdfFont TITLE_FONT;
+    private static final PdfFont LEGEND_FONT;
+    private static final PdfFont CONTENT_FONT;
+    private static final PdfFont NUMBER_FONT;
+
+    private static final float TITLE_FONT_SIZE = 8f;
+    private static final float LEGEND_FONT_SIZE = 7f;
+    private static final float CONTENT_FONT_SIZE = 9f;
+    private static final float NUMBER_FONT_SIZE = 7f;
 
     static {
         try {
-            TITLE_FONT = new Font(Font.FontFamily.HELVETICA, 8, Font.BOLD, BaseColor.BLACK);
-            LEGEND_FONT = new Font(Font.FontFamily.HELVETICA, 7, Font.NORMAL, BaseColor.BLACK);
-            CONTENT_FONT = new Font(Font.FontFamily.HELVETICA, 9, Font.NORMAL, BaseColor.BLACK);
-            NUMBER_FONT = new Font(Font.FontFamily.HELVETICA, 7f, Font.BOLD, BaseColor.BLACK);
+            TITLE_FONT = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+            LEGEND_FONT = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            CONTENT_FONT = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            NUMBER_FONT = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new ExceptionInInitializerError(e);
         }
     }
 
-    // --- EVENTOS ---
+    // --- RENDERERS (equivalente aos eventos do iText 5) ---
 
-    static class RoundBottomBorderEvent implements PdfPCellEvent {
+    static class RoundBottomBorderRenderer extends CellRenderer {
+        public RoundBottomBorderRenderer(Cell modelElement) {
+            super(modelElement);
+        }
+
         @Override
-        public void cellLayout(PdfPCell cell, Rectangle position, PdfContentByte[] canvases) {
-            PdfContentByte cb = canvases[PdfPTable.LINECANVAS];
+        public void draw(DrawContext drawContext) {
+            super.draw(drawContext);
+
+            Rectangle position = getOccupiedAreaBBox();
+            PdfCanvas cb = drawContext.getCanvas();
             cb.saveState();
             cb.setLineWidth(LINE_WIDTH);
-            cb.setColorStroke(BaseColor.BLACK);
+            cb.setStrokeColor(ColorConstants.BLACK);
 
             float adj = LINE_WIDTH / 2;
             float left = position.getLeft() + adj;
@@ -66,77 +93,112 @@ public class PdfFieldUtils {
             cb.stroke();
             cb.restoreState();
         }
+
+        @Override
+        public IRenderer getNextRenderer() {
+            return new RoundBottomBorderRenderer((Cell) getModelElement());
+        }
     }
 
     /**
-     * Desenha o quadrado E o número manualmente no topo esquerdo.
-     * Adiciona preenchimento Branco para cobrir linhas de fundo.
+     * Desenha o quadrado e o texto no topo esquerdo.
+     * Útil tanto para número do campo quanto para caixa de resposta.
      */
-    static class TopLeftSquareEvent implements PdfPCellEvent {
+    static class TopLeftSquareRenderer extends CellRenderer {
         private final float size;
         private final String text;
+        private final PdfFont font;
+        private final float fontSize;
 
-        public TopLeftSquareEvent(float size, String text) {
+        public TopLeftSquareRenderer(Cell modelElement, float size, String text, PdfFont font, float fontSize) {
+            super(modelElement);
             this.size = size;
             this.text = text;
+            this.font = font;
+            this.fontSize = fontSize;
         }
 
         @Override
-        public void cellLayout(PdfPCell cell, Rectangle position, PdfContentByte[] canvases) {
-            PdfContentByte cb = canvases[PdfPTable.LINECANVAS];
+        public void draw(DrawContext drawContext) {
+            super.draw(drawContext);
+
+            Rectangle position = getOccupiedAreaBBox();
+            PdfCanvas cb = drawContext.getCanvas();
+
             cb.saveState();
             cb.setLineWidth(LINE_WIDTH);
-            cb.setColorStroke(BaseColor.BLACK);
-            cb.setColorFill(BaseColor.WHITE); // Fundo Branco
+            cb.setStrokeColor(ColorConstants.BLACK);
+            cb.setFillColor(ColorConstants.WHITE);
 
             float adj = LINE_WIDTH / 2;
             float x = position.getLeft() + adj;
-            float y = position.getTop() - adj;
+            float yTop = position.getTop() - adj;
 
-            // Desenha Quadrado (Preenchido e com Borda)
-            cb.rectangle(x, y - size, size, size);
+            cb.rectangle(x, yTop - size, size, size);
             cb.fillStroke();
             cb.restoreState();
 
-            // Desenha o Texto Centralizado no Quadrado
-            PdfContentByte textCanvas = canvases[PdfPTable.TEXTCANVAS];
-            textCanvas.saveState();
-            float centerX = x + (size / 2);
-            float centerY = y - (size / 2);
-            float verticalOffset = (NUMBER_FONT.getSize() / 3.5f);
+            String safeText = text != null ? text : "";
+            if (!safeText.isEmpty()) {
+                float centerX = x + (size / 2);
+                float centerY = yTop - (size / 2);
+                float verticalOffset = (fontSize / 3.5f);
 
-            ColumnText.showTextAligned(textCanvas, Element.ALIGN_CENTER,
-                    new Phrase(text, NUMBER_FONT), centerX, centerY - verticalOffset, 0);
-            textCanvas.restoreState();
+                cb.saveState();
+                cb.beginText();
+                cb.setFontAndSize(font, fontSize);
+                float textWidth = font.getWidth(safeText) * fontSize / 1000f;
+                float textX = centerX - (textWidth / 2);
+                float textY = (centerY - verticalOffset) - (fontSize / 3.2f);
+                cb.moveText(textX, textY);
+                cb.showText(safeText);
+                cb.endText();
+                cb.restoreState();
+            }
+        }
+
+        @Override
+        public IRenderer getNextRenderer() {
+            return new TopLeftSquareRenderer((Cell) getModelElement(), size, text, font, fontSize);
         }
     }
 
-    static class CenteredSquareEvent implements PdfPCellEvent {
+    static class CenteredSquareRenderer extends CellRenderer {
         private final float size;
 
-        public CenteredSquareEvent(float size) {
+        public CenteredSquareRenderer(Cell modelElement, float size) {
+            super(modelElement);
             this.size = size;
         }
 
         @Override
-        public void cellLayout(PdfPCell cell, Rectangle position, PdfContentByte[] canvases) {
-            PdfContentByte cb = canvases[PdfPTable.LINECANVAS];
+        public void draw(DrawContext drawContext) {
+            super.draw(drawContext);
+
+            Rectangle position = getOccupiedAreaBBox();
+            PdfCanvas cb = drawContext.getCanvas();
             cb.saveState();
             cb.setLineWidth(LINE_WIDTH);
-            cb.setColorStroke(BaseColor.BLACK);
+            cb.setStrokeColor(ColorConstants.BLACK);
+
             float centerX = (position.getLeft() + position.getRight()) / 2;
             float centerY = (position.getTop() + position.getBottom()) / 2;
             cb.rectangle(centerX - (size / 2), centerY - (size / 2), size, size);
             cb.stroke();
             cb.restoreState();
         }
+
+        @Override
+        public IRenderer getNextRenderer() {
+            return new CenteredSquareRenderer((Cell) getModelElement(), size);
+        }
     }
 
     // --- MÉTODOS AUXILIARES ---
 
-    private static void configureMainCell(PdfPCell mainCell) {
-        mainCell.setBorder(Rectangle.NO_BORDER);
-        mainCell.setCellEvent(new RoundBottomBorderEvent());
+    private static void configureMainCell(Cell mainCell) {
+        mainCell.setBorder(Border.NO_BORDER);
+        mainCell.setNextRenderer(new RoundBottomBorderRenderer(mainCell));
         mainCell.setPaddingTop(0);
         mainCell.setPaddingLeft(0);
         mainCell.setPaddingRight(0);
@@ -147,165 +209,156 @@ public class PdfFieldUtils {
      * Cria a célula de cabeçalho unificada.
      * Título na mesma célula do número, apenas empurrado com Padding.
      */
-    private static PdfPCell createHeaderCell(String number, String title) {
-        PdfPCell cell = new PdfPCell(new Phrase(title, TITLE_FONT));
-        cell.setBorder(Rectangle.NO_BORDER);
+    private static Cell createHeaderCell(String number, String title) {
+        Paragraph p = new Paragraph(title != null ? title : "")
+                .setFont(TITLE_FONT)
+                .setFontSize(TITLE_FONT_SIZE)
+                .setMargin(0);
 
-        // 1. O Evento desenha o número no canto esquerdo (0,0 da célula)
-        cell.setCellEvent(new TopLeftSquareEvent(NUMBER_BOX_SIZE, number));
-
-        // 2. Empurramos o texto do título para a direita para não bater no quadrado
-        // Tamanho do quadrado + 5pt de margem visual
+        Cell cell = new Cell().add(p);
+        cell.setBorder(Border.NO_BORDER);
         cell.setPaddingLeft(NUMBER_BOX_SIZE + 5f);
-
-        // Ajuste vertical para o título alinhar com o centro do quadrado
-        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-
-        // Pequeno ajuste de topo para o texto não ficar colado na linha superior
-        // invisível
         cell.setPaddingTop(2f);
-
-        // Garante altura mínima para caber o quadrado
-        cell.setMinimumHeight(NUMBER_BOX_SIZE + 2f);
-
+        cell.setVerticalAlignment(VerticalAlignment.MIDDLE);
+        cell.setMinHeight(NUMBER_BOX_SIZE + 2f);
+        cell.setNextRenderer(new TopLeftSquareRenderer(cell, NUMBER_BOX_SIZE, number, NUMBER_FONT, NUMBER_FONT_SIZE));
         return cell;
     }
 
     // --- CAMPOS ---
 
     /** TIPO 1: Zona (29) */
-    public static PdfPCell createFieldWithLegendAndAnswerBox(
+    public static Cell createFieldWithLegendAndAnswerBox(
             String fieldNumber, String title, List<String> legendLines, String answer, float widthPercentage) {
 
         // Tabela principal interna de 2 colunas:
         // Coluna 1: (85%) Título + Legendas
         // Coluna 2: (15%) Caixa de Resposta (Alinhada ao Topo)
-        PdfPTable splitTable = new PdfPTable(new float[] { 85f, 15f });
-        splitTable.setWidthPercentage(100);
+        Table splitTable = new Table(UnitValue.createPercentArray(new float[] { 85f, 15f }))
+            .useAllAvailableWidth();
 
         // --- COLUNA DA ESQUERDA (Título + Legenda) ---
-        PdfPTable leftContent = new PdfPTable(1);
-        leftContent.setWidthPercentage(100);
-        leftContent.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+        Table leftContent = new Table(1).useAllAvailableWidth();
 
         // 1. Cabeçalho (Número [29] + Título "Zona")
         // Usamos a lógica de célula única para evitar desalinhamento
-        PdfPCell headerCell = new PdfPCell(new Phrase(title, TITLE_FONT));
-        headerCell.setBorder(Rectangle.NO_BORDER);
-        // Desenha o quadrado [29] no topo esquerdo
-        headerCell.setCellEvent(new TopLeftSquareEvent(NUMBER_BOX_SIZE, fieldNumber));
-        // Empurra o texto "Zona" para a direita
+        Paragraph headerP = new Paragraph(title != null ? title : "")
+            .setFont(TITLE_FONT)
+            .setFontSize(TITLE_FONT_SIZE)
+            .setMargin(0);
+        Cell headerCell = new Cell().add(headerP);
+        headerCell.setBorder(Border.NO_BORDER);
         headerCell.setPaddingLeft(NUMBER_BOX_SIZE + 5f);
         headerCell.setPaddingTop(2f);
-        headerCell.setMinimumHeight(NUMBER_BOX_SIZE + 2f);
+        headerCell.setMinHeight(NUMBER_BOX_SIZE + 2f);
+        headerCell.setNextRenderer(new TopLeftSquareRenderer(headerCell, NUMBER_BOX_SIZE, fieldNumber, NUMBER_FONT, NUMBER_FONT_SIZE));
         leftContent.addCell(headerCell);
 
         // 2. Legendas (Logo abaixo do título)
         for (String line : legendLines) {
-            PdfPCell l = new PdfPCell(new Phrase(line, LEGEND_FONT));
-            l.setBorder(Rectangle.NO_BORDER);
-            // Alinha com o texto do título (pula o quadrado)
+            Paragraph lp = new Paragraph(line != null ? line : "")
+                    .setFont(LEGEND_FONT)
+                    .setFontSize(LEGEND_FONT_SIZE)
+                    .setMargin(0);
+            Cell l = new Cell().add(lp);
+            l.setBorder(Border.NO_BORDER);
             l.setPaddingLeft(NUMBER_BOX_SIZE + 5f);
-            l.setPaddingTop(0f); // Cola no título
+            l.setPaddingTop(0f);
             l.setPaddingBottom(1f);
             leftContent.addCell(l);
         }
 
-        PdfPCell leftCell = new PdfPCell(leftContent);
-        leftCell.setBorder(Rectangle.NO_BORDER);
+        Cell leftCell = new Cell().add(leftContent);
+        leftCell.setBorder(Border.NO_BORDER);
         leftCell.setPadding(0);
         splitTable.addCell(leftCell);
 
         // --- COLUNA DA DIREITA (Resposta [1]) ---
         // Usamos uma tabela aninhada para garantir o mesmo alinhamento vertical da esquerda
-        PdfPTable rightContent = new PdfPTable(1);
-        rightContent.setWidthPercentage(100);
-        rightContent.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+        Table rightContent = new Table(1).useAllAvailableWidth();
 
         // Célula vazia no corpo, a resposta é desenhada dentro do quadrado pelo evento
-        PdfPCell answerCell = new PdfPCell(new Phrase("", CONTENT_FONT));
-        answerCell.setBorder(Rectangle.NO_BORDER);
-
-        // Desenha o quadrado com a resposta dentro
-        answerCell.setCellEvent(new TopLeftSquareEvent(ANSWER_BOX_SIZE, answer != null ? answer : ""));
-
-        // Remove padding para o quadrado ficar no topo absoluto da célula
+        Cell answerCell = new Cell();
+        answerCell.setBorder(Border.NO_BORDER);
         answerCell.setPadding(0);
-        answerCell.setPaddingTop(0);
-
-        // Altura mínima para não cortar
-        answerCell.setMinimumHeight(ANSWER_BOX_SIZE + 2f);
-
+        answerCell.setMinHeight(ANSWER_BOX_SIZE + 2f);
+        answerCell.setNextRenderer(new TopLeftSquareRenderer(answerCell, ANSWER_BOX_SIZE,
+            answer != null ? answer : "", NUMBER_FONT, NUMBER_FONT_SIZE));
         rightContent.addCell(answerCell);
 
-        PdfPCell rightCell = new PdfPCell(rightContent);
-        rightCell.setBorder(Rectangle.NO_BORDER);
+        Cell rightCell = new Cell().add(rightContent);
+        rightCell.setBorder(Border.NO_BORDER);
         rightCell.setPadding(0);
-
         splitTable.addCell(rightCell);
 
         // --- CÉLULA MESTRA (Wrapper com borda em U) ---
-        PdfPCell mainCell = new PdfPCell(splitTable);
-        configureMainCell(mainCell); // Borda redonda, padding 0
-
+        Cell mainCell = new Cell().add(splitTable);
+        configureMainCell(mainCell);
         return mainCell;
     }
 
     /** TIPO 2: Descritivo (32) */
-    public static PdfPCell createDescriptiveField(
+    public static Cell createDescriptiveField(
             String fieldNumber, String title, String content, float widthPercentage, float minHeight) {
 
-        PdfPTable mainTable = new PdfPTable(1);
-        mainTable.setWidthPercentage(100);
+        Table mainTable = new Table(1).useAllAvailableWidth();
 
         // Header unificado (Corrige o problema do "empurrão")
         mainTable.addCell(createHeaderCell(fieldNumber, title));
 
         // Conteúdo
-        PdfPCell contentCell = new PdfPCell(new Phrase(content != null ? content : "", CONTENT_FONT));
-        contentCell.setBorder(Rectangle.NO_BORDER);
+        Paragraph cp = new Paragraph(content != null ? content : "")
+                .setFont(CONTENT_FONT)
+                .setFontSize(CONTENT_FONT_SIZE)
+                .setMargin(0);
+        Cell contentCell = new Cell().add(cp);
+        contentCell.setBorder(Border.NO_BORDER);
         contentCell.setPaddingLeft(5f);
         contentCell.setPaddingRight(5f);
         contentCell.setPaddingBottom(5f);
         mainTable.addCell(contentCell);
 
-        PdfPCell mainCell = new PdfPCell(mainTable);
+        Cell mainCell = new Cell().add(mainTable);
         configureMainCell(mainCell);
         if (minHeight > 0)
-            mainCell.setMinimumHeight(minHeight);
+            mainCell.setMinHeight(minHeight);
         return mainCell;
     }
 
     /** TIPO 3: Múltipla Escolha (33) */
-    public static PdfPCell createMultipleOptionsField(
+    public static Cell createMultipleOptionsField(
             String fieldNumber, String title, String legend, List<String> options,
             List<String> answers, int columns, float widthPercentage, boolean hasOther, String otherVal) {
 
-        PdfPTable mainTable = new PdfPTable(1);
-        mainTable.setWidthPercentage(100);
+        Table mainTable = new Table(1).useAllAvailableWidth();
 
         // Header Personalizado para incluir Legenda na mesma linha
         // Usamos Phrase para manter o modo texto e o alinhamento correto (igual ao createHeaderCell)
-        Phrase headerPhrase = new Phrase();
-        headerPhrase.add(new Chunk(title, TITLE_FONT));
-        headerPhrase.add(new Chunk("   " + legend, LEGEND_FONT));
+        Paragraph headerP = new Paragraph()
+            .setMargin(0);
+        headerP.add(new Text(title != null ? title : "")
+            .setFont(TITLE_FONT)
+            .setFontSize(TITLE_FONT_SIZE));
+        headerP.add(new Text("   " + (legend != null ? legend : ""))
+            .setFont(LEGEND_FONT)
+            .setFontSize(LEGEND_FONT_SIZE));
 
-        PdfPCell headerCell = new PdfPCell(headerPhrase);
-        headerCell.setBorder(Rectangle.NO_BORDER);
-        headerCell.setCellEvent(new TopLeftSquareEvent(NUMBER_BOX_SIZE, fieldNumber));
-        headerCell.setPaddingLeft(NUMBER_BOX_SIZE + 5f); // Padding para o quadrado
+        Cell headerCell = new Cell().add(headerP);
+        headerCell.setBorder(Border.NO_BORDER);
+        headerCell.setPaddingLeft(NUMBER_BOX_SIZE + 5f);
         headerCell.setPaddingTop(2f);
-        headerCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        headerCell.setMinimumHeight(NUMBER_BOX_SIZE + 2f);
-
+        headerCell.setVerticalAlignment(VerticalAlignment.MIDDLE);
+        headerCell.setMinHeight(NUMBER_BOX_SIZE + 2f);
+        headerCell.setNextRenderer(new TopLeftSquareRenderer(headerCell, NUMBER_BOX_SIZE, fieldNumber, NUMBER_FONT, NUMBER_FONT_SIZE));
         mainTable.addCell(headerCell);
 
         // Grid de Opções
         float[] ws = new float[columns];
-        for (int i = 0; i < columns; i++)
+        for (int i = 0; i < columns; i++) {
             ws[i] = 100f / columns;
-        PdfPTable grid = new PdfPTable(ws);
-        grid.setWidthPercentage(100);
+        }
+
+        Table grid = new Table(UnitValue.createPercentArray(ws)).useAllAvailableWidth();
 
         for (int i = 0; i < options.size(); i++) {
             String ans = (answers != null && i < answers.size()) ? answers.get(i) : "";
@@ -314,99 +367,116 @@ public class PdfFieldUtils {
         int rem = options.size() % columns;
         if (rem > 0) {
             for (int i = 0; i < (columns - rem); i++) {
-                PdfPCell e = new PdfPCell(new Phrase(""));
-                e.setBorder(Rectangle.NO_BORDER);
+                Cell e = new Cell();
+                e.setBorder(Border.NO_BORDER);
                 grid.addCell(e);
             }
         }
 
-        PdfPCell gridRow = new PdfPCell(grid);
-        gridRow.setBorder(Rectangle.NO_BORDER);
+        Cell gridRow = new Cell().add(grid);
+        gridRow.setBorder(Border.NO_BORDER);
         gridRow.setPaddingLeft(5f);
         mainTable.addCell(gridRow);
 
         // Outros
         if (hasOther) {
             // Cria tabela com mesma estrutura do grid de opções (usando ws)
-            PdfPTable otherRow = new PdfPTable(ws);
-            otherRow.setWidthPercentage(100);
+            Table otherRow = new Table(UnitValue.createPercentArray(ws)).useAllAvailableWidth();
 
             // Primeira coluna: checkbox + label "Outros:" (mesma estrutura de createOptionWithCheckbox)
-            PdfPTable firstColTable = new PdfPTable(new float[] { 15f, 85f });
-            firstColTable.setWidthPercentage(100);
+                Table firstColTable = new Table(UnitValue.createPercentArray(new float[] { 15f, 85f }))
+                    .useAllAvailableWidth();
 
-            PdfPCell ck = new PdfPCell(new Phrase(""));
-            ck.setBorder(Rectangle.NO_BORDER);
-            ck.setCellEvent(new CenteredSquareEvent(CHECKBOX_SIZE));
-            ck.setFixedHeight(CHECKBOX_SIZE + 4f);
-            ck.setHorizontalAlignment(Element.ALIGN_CENTER);
-            ck.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            firstColTable.addCell(ck);
+                Cell ck = new Cell();
+                ck.setBorder(Border.NO_BORDER);
+                ck.setHeight(CHECKBOX_SIZE + 4f);
+                ck.setTextAlignment(TextAlignment.CENTER);
+                ck.setVerticalAlignment(VerticalAlignment.MIDDLE);
+                ck.setNextRenderer(new CenteredSquareRenderer(ck, CHECKBOX_SIZE));
+                firstColTable.addCell(ck);
 
-            PdfPCell lbl = new PdfPCell(new Phrase("Outros:", LEGEND_FONT));
-            lbl.setBorder(Rectangle.NO_BORDER);
-            lbl.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            lbl.setPaddingLeft(2f);
-            firstColTable.addCell(lbl);
+                Paragraph lblP = new Paragraph("Outros:")
+                    .setFont(LEGEND_FONT)
+                    .setFontSize(LEGEND_FONT_SIZE)
+                    .setMargin(0);
+                Cell lbl = new Cell().add(lblP);
+                lbl.setBorder(Border.NO_BORDER);
+                lbl.setVerticalAlignment(VerticalAlignment.MIDDLE);
+                lbl.setPaddingLeft(2f);
+                firstColTable.addCell(lbl);
 
-            PdfPCell firstCol = new PdfPCell(firstColTable);
-            firstCol.setBorder(Rectangle.NO_BORDER);
-            firstCol.setPadding(0);
-            otherRow.addCell(firstCol);
+                Cell firstCol = new Cell().add(firstColTable);
+                firstCol.setBorder(Border.NO_BORDER);
+                firstCol.setPadding(0);
+                otherRow.addCell(firstCol);
 
             // Colunas restantes: mescladas para o campo de input
             if (columns > 1) {
-                PdfPCell v = new PdfPCell(new Phrase(otherVal != null ? otherVal : "", CONTENT_FONT));
-                v.setBorder(Rectangle.BOTTOM);
-                v.setBorderWidth(0.5f);
+                Paragraph vP = new Paragraph(otherVal != null ? otherVal : "")
+                        .setFont(CONTENT_FONT)
+                        .setFontSize(CONTENT_FONT_SIZE)
+                        .setMargin(0);
+                Cell v = new Cell(1, columns - 1).add(vP);
+                v.setBorderTop(Border.NO_BORDER);
+                v.setBorderLeft(Border.NO_BORDER);
+                v.setBorderRight(Border.NO_BORDER);
+                v.setBorderBottom(new com.itextpdf.layout.borders.SolidBorder(ColorConstants.BLACK, 0.5f));
                 v.setPaddingLeft(3f);
                 v.setPaddingRight(50f);
-                v.setVerticalAlignment(Element.ALIGN_MIDDLE);
-                v.setColspan(columns - 1);
+                v.setVerticalAlignment(VerticalAlignment.MIDDLE);
                 otherRow.addCell(v);
             }
 
-            PdfPCell oRowWrapper = new PdfPCell(otherRow);
-            oRowWrapper.setBorder(Rectangle.NO_BORDER);
+            Cell oRowWrapper = new Cell().add(otherRow);
+            oRowWrapper.setBorder(Border.NO_BORDER);
             oRowWrapper.setPaddingTop(5f);
             oRowWrapper.setPaddingLeft(5f);
             mainTable.addCell(oRowWrapper);
         }
 
-        PdfPCell mainCell = new PdfPCell(mainTable);
+        Cell mainCell = new Cell().add(mainTable);
         configureMainCell(mainCell);
         return mainCell;
     }
 
-    private static PdfPCell createOptionWithCheckbox(String txt, String ans) {
-        PdfPTable t = new PdfPTable(new float[] { 15f, 85f });
-        t.setWidthPercentage(100);
+    private static Cell createOptionWithCheckbox(String txt, String ans) {
+        Table t = new Table(UnitValue.createPercentArray(new float[] { 15f, 85f }))
+                .useAllAvailableWidth();
 
-        PdfPCell ck = new PdfPCell(new Phrase(ans != null ? ans : "", new Font(Font.FontFamily.HELVETICA, 7)));
-        ck.setBorder(Rectangle.NO_BORDER);
-        ck.setCellEvent(new CenteredSquareEvent(CHECKBOX_SIZE));
-        ck.setFixedHeight(CHECKBOX_SIZE + 4f);
-        ck.setHorizontalAlignment(Element.ALIGN_CENTER);
-        ck.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        Paragraph ckP = new Paragraph(ans != null ? ans : "")
+                .setFont(LEGEND_FONT)
+                .setFontSize(LEGEND_FONT_SIZE)
+                .setMargin(0);
+        Cell ck = new Cell().add(ckP);
+        ck.setBorder(Border.NO_BORDER);
+        ck.setHeight(CHECKBOX_SIZE + 4f);
+        ck.setTextAlignment(TextAlignment.CENTER);
+        ck.setVerticalAlignment(VerticalAlignment.MIDDLE);
+        ck.setNextRenderer(new CenteredSquareRenderer(ck, CHECKBOX_SIZE));
         t.addCell(ck);
 
-        PdfPCell tx = new PdfPCell(new Phrase(txt, LEGEND_FONT));
-        tx.setBorder(Rectangle.NO_BORDER);
-        tx.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        Paragraph txP = new Paragraph(txt != null ? txt : "")
+                .setFont(LEGEND_FONT)
+                .setFontSize(LEGEND_FONT_SIZE)
+                .setMargin(0);
+        Cell tx = new Cell().add(txP);
+        tx.setBorder(Border.NO_BORDER);
+        tx.setVerticalAlignment(VerticalAlignment.MIDDLE);
         tx.setPaddingLeft(2f);
         t.addCell(tx);
 
-        PdfPCell c = new PdfPCell(t);
-        c.setBorder(Rectangle.NO_BORDER);
+        Cell c = new Cell().add(t);
+        c.setBorder(Border.NO_BORDER);
         return c;
     }
 
-    public static PdfPTable createResponsiveRow(PdfPCell[] cells, float[] widths) {
-        PdfPTable t = new PdfPTable(widths);
-        t.setWidthPercentage(100);
-        t.setSpacingBefore(0f);
-        for (PdfPCell c : cells)
+    public static Table createResponsiveRow(Cell[] cells, float[] widths) {
+        Table t = new Table(UnitValue.createPercentArray(widths)).useAllAvailableWidth();
+        t.setMarginTop(0f);
+        t.setBorder(Border.NO_BORDER);
+        for (Cell c : cells) {
             t.addCell(c);
+        }
         return t;
     }
 }
