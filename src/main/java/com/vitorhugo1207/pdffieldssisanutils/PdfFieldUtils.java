@@ -327,30 +327,50 @@ public class PdfFieldUtils {
 
         // Outros
         if (hasOther) {
-            PdfPTable otherTable = new PdfPTable(new float[] { 15f, 30f, 150f });
-            otherTable.setWidthPercentage(100);
+            // Cria tabela com mesma estrutura do grid de opções (usando ws)
+            PdfPTable otherRow = new PdfPTable(ws);
+            otherRow.setWidthPercentage(100);
+
+            // Primeira coluna: checkbox + label "Outros:" (mesma estrutura de createOptionWithCheckbox)
+            PdfPTable firstColTable = new PdfPTable(new float[] { 15f, 85f });
+            firstColTable.setWidthPercentage(100);
 
             PdfPCell ck = new PdfPCell(new Phrase(""));
             ck.setBorder(Rectangle.NO_BORDER);
             ck.setCellEvent(new CenteredSquareEvent(CHECKBOX_SIZE));
             ck.setFixedHeight(CHECKBOX_SIZE + 4f);
-            otherTable.addCell(ck);
+            ck.setHorizontalAlignment(Element.ALIGN_CENTER);
+            ck.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            firstColTable.addCell(ck);
 
             PdfPCell lbl = new PdfPCell(new Phrase("Outros:", LEGEND_FONT));
             lbl.setBorder(Rectangle.NO_BORDER);
             lbl.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            otherTable.addCell(lbl);
+            lbl.setPaddingLeft(2f);
+            firstColTable.addCell(lbl);
 
-            PdfPCell v = new PdfPCell(new Phrase(otherVal != null ? otherVal : "", CONTENT_FONT));
-            v.setBorder(Rectangle.BOTTOM);
-            v.setBorderWidth(0.5f);
-            otherTable.addCell(v);
+            PdfPCell firstCol = new PdfPCell(firstColTable);
+            firstCol.setBorder(Rectangle.NO_BORDER);
+            firstCol.setPadding(0);
+            otherRow.addCell(firstCol);
 
-            PdfPCell oRow = new PdfPCell(otherTable);
-            oRow.setBorder(Rectangle.NO_BORDER);
-            oRow.setPaddingLeft(5f);
-            oRow.setPaddingTop(5f);
-            mainTable.addCell(oRow);
+            // Colunas restantes: mescladas para o campo de input
+            if (columns > 1) {
+                PdfPCell v = new PdfPCell(new Phrase(otherVal != null ? otherVal : "", CONTENT_FONT));
+                v.setBorder(Rectangle.BOTTOM);
+                v.setBorderWidth(0.5f);
+                v.setPaddingLeft(3f);
+                v.setPaddingRight(50f);
+                v.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                v.setColspan(columns - 1);
+                otherRow.addCell(v);
+            }
+
+            PdfPCell oRowWrapper = new PdfPCell(otherRow);
+            oRowWrapper.setBorder(Rectangle.NO_BORDER);
+            oRowWrapper.setPaddingTop(5f);
+            oRowWrapper.setPaddingLeft(5f);
+            mainTable.addCell(oRowWrapper);
         }
 
         PdfPCell mainCell = new PdfPCell(mainTable);
